@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Gauge, Clock, Grid3X3, FileText, CheckCircle } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
 import { PressingRecord } from '../types';
 
 export function Pressing() {
-  const { pressingRecords, batches, addPressingRecord, updateBatchStatus } = useAppStore();
+  const { pressingRecords, batches, selectedBatch, addPressingRecord, updateBatchStatus } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     batchId: '',
@@ -16,6 +16,13 @@ export function Pressing() {
     arrangementPattern: '5x8网格',
     notes: '',
   });
+
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.status === 'pressing') {
+      setFormData(prev => ({ ...prev, batchId: selectedBatch.id }));
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

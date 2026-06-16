@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Receipt, User, Package, DollarSign, FileText, CheckCircle, TrendingUp, BarChart3, PieChart, Filter, X, Truck, CheckCheck, RotateCcw } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
@@ -9,9 +9,23 @@ import { mockMonthlyProduction } from '../data/mockData';
 const COLORS = ['#8B0000', '#556B2F', '#DEB887'];
 
 export function Sales() {
-  const { salesOrders, batches, addSalesOrder, updateBatchStatus, getDashboardStats, updateSalesOrder } = useAppStore();
+  const { salesOrders, batches, selectedBatch, addSalesOrder, updateBatchStatus, getDashboardStats, updateSalesOrder } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const stats = getDashboardStats();
+
+  useEffect(() => {
+    if (selectedBatch && (selectedBatch.status === 'completed' || selectedBatch.status === 'sold')) {
+      const productType = selectedBatch.productType === 'red' ? '红方腐乳' : 
+                          selectedBatch.productType === 'green' ? '青方腐乳' : '白方腐乳';
+      setFormData(prev => ({ 
+        ...prev, 
+        batchId: selectedBatch.id,
+        productType,
+        quantity: selectedBatch.totalOutput,
+      }));
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const [filters, setFilters] = useState({
     dateFrom: '',
@@ -20,7 +34,7 @@ export function Sales() {
     status: '',
   });
 
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
 
   const uniqueCustomers = useMemo(() => {
     const customers = new Set(salesOrders.map(o => o.customerName));
@@ -268,55 +282,148 @@ export function Sales() {
           </button>
         </div>
 
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setFilters(prev => ({ ...prev, status: '' }))}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              !filters.status 
+                ? 'bg-primary-600 text-white shadow-md' 
+                : 'bg-cream-100 text-cream-700 hover:bg-cream-200'
+            }`}
+          >
+            全部
+          </button>
+          <button
+            onClick={() => setFilters(prev => ({ ...prev, status: 'pending' }))}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              filters.status === 'pending' 
+                ? 'bg-red-500 text-white shadow-md' 
+                : 'bg-red-50 text-red-700 hover:bg-red-100'
+            }`}
+          >
+            待处理
+          </button>
+          <button
+            onClick={() => setFilters(prev => ({ ...prev, status: 'shipped' }))}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              filters.status === 'shipped' 
+                ? 'bg-amber-500 text-white shadow-md' 
+                : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+            }`}
+          >
+            已发货
+          </button>
+          <button
+            onClick={() => setFilters(prev => ({ ...prev, status: 'completed' }))}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              filters.status === 'completed' 
+                ? 'bg-green-500 text-white shadow-md' 
+                : 'bg-green-50 text-green-700 hover:bg-green-100'
+            }`}
+          >
+            已完成
+          </button>
+        </div>
+
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div>
-              <label className="label-text">开始日期</label>
-              <input
-                type="date"
-                name="dateFrom"
-                value={filters.dateFrom}
-                onChange={handleFilterChange}
-                className="input-field"
-              />
+          <div className="space-y-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="label-text">开始日期</label>
+                <input
+                  type="date"
+                  name="dateFrom"
+                  value={filters.dateFrom}
+                  onChange={handleFilterChange}
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="label-text">结束日期</label>
+                <input
+                  type="date"
+                  name="dateTo"
+                  value={filters.dateTo}
+                  onChange={handleFilterChange}
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="label-text">客户名称</label>
+                <select
+                  name="customer"
+                  value={filters.customer}
+                  onChange={handleFilterChange}
+                  className="input-field"
+                >
+                  <option value="">全部客户</option>
+                  {uniqueCustomers.map(customer => (
+                    <option key={customer} value={customer}>{customer}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label-text">订单状态</label>
+                <select
+                  name="status"
+                  value={filters.status}
+                  onChange={handleFilterChange}
+                  className="input-field"
+                >
+                  <option value="">全部状态</option>
+                  <option value="pending">待处理</option>
+                  <option value="shipped">已发货</option>
+                  <option value="completed">已完成</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="label-text">结束日期</label>
-              <input
-                type="date"
-                name="dateTo"
-                value={filters.dateTo}
-                onChange={handleFilterChange}
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="label-text">客户名称</label>
-              <select
-                name="customer"
-                value={filters.customer}
-                onChange={handleFilterChange}
-                className="input-field"
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-cream-500">快捷日期:</span>
+              <button
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setFilters(prev => ({ ...prev, dateFrom: today, dateTo: today }));
+                }}
+                className="px-2 py-1 text-xs bg-cream-100 text-cream-700 rounded hover:bg-cream-200 transition-colors"
               >
-                <option value="">全部客户</option>
-                {uniqueCustomers.map(customer => (
-                  <option key={customer} value={customer}>{customer}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-text">订单状态</label>
-              <select
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                className="input-field"
+                今天
+              </button>
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const weekStart = new Date(today);
+                  weekStart.setDate(today.getDate() - today.getDay());
+                  setFilters(prev => ({ 
+                    ...prev, 
+                    dateFrom: weekStart.toISOString().split('T')[0], 
+                    dateTo: today.toISOString().split('T')[0] 
+                  }));
+                }}
+                className="px-2 py-1 text-xs bg-cream-100 text-cream-700 rounded hover:bg-cream-200 transition-colors"
               >
-                <option value="">全部状态</option>
-                <option value="pending">待处理</option>
-                <option value="shipped">已发货</option>
-                <option value="completed">已完成</option>
-              </select>
+                本周
+              </button>
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                  setFilters(prev => ({ 
+                    ...prev, 
+                    dateFrom: monthStart.toISOString().split('T')[0], 
+                    dateTo: today.toISOString().split('T')[0] 
+                  }));
+                }}
+                className="px-2 py-1 text-xs bg-cream-100 text-cream-700 rounded hover:bg-cream-200 transition-colors"
+              >
+                本月
+              </button>
+              <button
+                onClick={() => setFilters(prev => ({ ...prev, dateFrom: '', dateTo: '' }))}
+                className="px-2 py-1 text-xs bg-cream-100 text-cream-500 rounded hover:bg-cream-200 transition-colors"
+              >
+                清除日期
+              </button>
             </div>
           </div>
         )}

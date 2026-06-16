@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Flame, Droplets, ThermometerSun, Clock, FileText, CheckCircle, Plus } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
@@ -6,7 +6,7 @@ import { GrindingRecord } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function Grinding() {
-  const { grindingRecords, batches, addGrindingRecord, updateBatchStatus } = useAppStore();
+  const { grindingRecords, batches, selectedBatch, addGrindingRecord, updateBatchStatus } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     batchId: '',
@@ -19,6 +19,13 @@ export function Grinding() {
     solidificationStatus: '良好',
     notes: '',
   });
+
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.status === 'grinding') {
+      setFormData(prev => ({ ...prev, batchId: selectedBatch.id }));
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const cookingTempData = [
     { time: '0分钟', temp: 25 },

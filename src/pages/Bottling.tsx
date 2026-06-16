@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FlaskConical, Droplets, Clock, Soup, FileText, CheckCircle, Star } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
 import { BottlingRecord } from '../types';
 
 export function Bottling() {
-  const { bottlingRecords, batches, addBottlingRecord, updateBatchStatus } = useAppStore();
+  const { bottlingRecords, batches, selectedBatch, addBottlingRecord, updateBatchStatus } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     batchId: '',
@@ -16,6 +16,13 @@ export function Bottling() {
     jarCount: 500,
     notes: '',
   });
+
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.status === 'bottling') {
+      setFormData(prev => ({ ...prev, batchId: selectedBatch.id }));
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

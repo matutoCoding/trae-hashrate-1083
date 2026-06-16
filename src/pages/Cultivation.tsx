@@ -6,7 +6,7 @@ import { CultivationRecord } from '../types';
 import { TemperatureHumidityChart } from '../components/Charts/TemperatureHumidityChart';
 
 export function Cultivation() {
-  const { cultivationRecords, batches, temperatureHumidityData, addCultivationRecord, updateBatchStatus, updateTemperatureHumidity } = useAppStore();
+  const { cultivationRecords, batches, selectedBatch, temperatureHumidityData, addCultivationRecord, updateBatchStatus, updateTemperatureHumidity } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     batchId: '',
@@ -25,6 +25,13 @@ export function Cultivation() {
     }, 300000);
     return () => clearInterval(timer);
   }, [updateTemperatureHumidity]);
+
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.status === 'cultivation') {
+      setFormData(prev => ({ ...prev, batchId: selectedBatch.id }));
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

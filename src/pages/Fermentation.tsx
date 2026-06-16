@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, Droplets, Thermometer, FileText, CheckCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
@@ -6,7 +6,7 @@ import { FermentationRecord } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function Fermentation() {
-  const { fermentationRecords, batches, addFermentationRecord, updateBatchStatus } = useAppStore();
+  const { fermentationRecords, batches, selectedBatch, addFermentationRecord, updateBatchStatus } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const [selectedType, setSelectedType] = useState<'red' | 'green'>('red');
   const [formData, setFormData] = useState({
@@ -18,6 +18,19 @@ export function Fermentation() {
     maturityLevel: '30%',
     notes: '',
   });
+
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.status === 'fermentation') {
+      setFormData(prev => ({ 
+        ...prev, 
+        batchId: selectedBatch.id,
+        flavorType: selectedBatch.productType === 'green' ? '青方' : '红方',
+        seasoningFormula: selectedBatch.productType === 'green' ? '青方臭豆腐配方' : '红方传统配方',
+      }));
+      setSelectedType(selectedBatch.productType === 'green' ? 'green' : 'red');
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

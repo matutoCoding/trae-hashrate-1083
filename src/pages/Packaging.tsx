@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, Droplets, Tag, CheckCircle, FileText, ClipboardCheck } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
 import { PackagingRecord } from '../types';
 
 export function Packaging() {
-  const { packagingRecords, batches, addPackagingRecord, updateBatchStatus } = useAppStore();
+  const { packagingRecords, batches, selectedBatch, addPackagingRecord, updateBatchStatus } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     batchId: '',
@@ -15,6 +15,23 @@ export function Packaging() {
     labelType: '传统红方标签',
     notes: '',
   });
+
+  useEffect(() => {
+    if (selectedBatch && selectedBatch.status === 'packaging') {
+      const soupStandard = selectedBatch.productType === 'green' ? '青方标准' : 
+                          selectedBatch.productType === 'white' ? '白方标准' : '红方标准';
+      const labelType = selectedBatch.productType === 'green' ? '青方臭豆腐标签' : 
+                       selectedBatch.productType === 'white' ? '白方清淡标签' : '传统红方标签';
+      setFormData(prev => ({ 
+        ...prev, 
+        batchId: selectedBatch.id,
+        soupStandard,
+        labelType,
+        bottleCount: selectedBatch.totalOutput,
+      }));
+      setShowForm(true);
+    }
+  }, [selectedBatch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
