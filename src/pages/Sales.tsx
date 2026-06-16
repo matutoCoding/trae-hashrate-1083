@@ -1,15 +1,41 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Receipt, User, Package, DollarSign, FileText, CheckCircle, TrendingUp, BarChart3, PieChart } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
 import { SalesOrder } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RePieChart, Pie, Cell } from 'recharts';
-import { mockMonthlyProduction, mockProductDistribution } from '../data/mockData';
+import { mockMonthlyProduction } from '../data/mockData';
+
+const COLORS = ['#8B0000', '#556B2F', '#DEB887'];
 
 export function Sales() {
   const { salesOrders, batches, addSalesOrder, updateBatchStatus, getDashboardStats } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const stats = getDashboardStats();
+
+  const productDistribution = useMemo(() => {
+    const productMap: Record<string, number> = {};
+    salesOrders.forEach(order => {
+      productMap[order.productType] = (productMap[order.productType] || 0) + order.quantity;
+    });
+    const total = Object.values(productMap).reduce((sum, qty) => sum + qty, 0);
+    return Object.entries(productMap).map(([name, value]) => ({
+      name,
+      value: total > 0 ? Math.round((value / total) * 100) : 0,
+    }));
+  }, [salesOrders]);
+
+  const monthlySalesQuantity = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    return salesOrders
+      .filter(order => order.saleDate.startsWith(currentMonth))
+      .reduce((sum, order) => sum + order.quantity, 0);
+  }, [salesOrders]);
+
+  const customerCount = useMemo(() => {
+    const customers = new Set(salesOrders.map(order => order.customerName));
+    return customers.size;
+  }, [salesOrders]);
   const [formData, setFormData] = useState<{
     batchId: string;
     customerName: string;
@@ -201,7 +227,7 @@ export function Sales() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-cream-600 mb-1">本月销售</p>
-              <p className="text-2xl font-bold text-cream-900 font-serif">{mockMonthlyProduction[5].销量.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-cream-900 font-serif">{monthlySalesQuantity.toLocaleString()}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center"><BarChart3 className="w-6 h-6 text-green-600" /></div>
           </div>
@@ -212,7 +238,7 @@ export function Sales() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-cream-600 mb-1">客户数量</p>
-              <p className="text-2xl font-bold text-cream-900 font-serif">12</p>
+              <p className="text-2xl font-bold text-cream-900 font-serif">{customerCount}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center"><User className="w-6 h-6 text-blue-600" /></div>
           </div>
@@ -246,7 +272,7 @@ export function Sales() {
             <ResponsiveContainer width="100%" height="100%">
               <RePieChart>
                 <Pie
-                  data={mockProductDistribution}
+                  data={productDistribution}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -255,7 +281,7 @@ export function Sales() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {mockProductDistribution.map((entry, index) => (
+                  {productDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

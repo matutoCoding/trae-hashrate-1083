@@ -24,6 +24,58 @@ import {
   generateTemperatureHumidityData 
 } from '../data/mockData';
 
+const STORAGE_KEY = 'fermentation-workshop-data';
+
+interface PersistedData {
+  batches: ProductionBatch[];
+  grindingRecords: GrindingRecord[];
+  pressingRecords: PressingRecord[];
+  cultivationRecords: CultivationRecord[];
+  bottlingRecords: BottlingRecord[];
+  fermentationRecords: FermentationRecord[];
+  packagingRecords: PackagingRecord[];
+  salesOrders: SalesOrder[];
+}
+
+const loadFromStorage = (): PersistedData | null => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load from localStorage:', e);
+  }
+  return null;
+};
+
+const saveToStorage = (data: PersistedData) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e);
+  }
+};
+
+const getInitialData = (): PersistedData => {
+  const stored = loadFromStorage();
+  if (stored) {
+    return stored;
+  }
+  return {
+    batches: mockBatches,
+    grindingRecords: mockGrindingRecords,
+    pressingRecords: mockPressingRecords,
+    cultivationRecords: mockCultivationRecords,
+    bottlingRecords: mockBottlingRecords,
+    fermentationRecords: mockFermentationRecords,
+    packagingRecords: mockPackagingRecords,
+    salesOrders: mockSalesOrders,
+  };
+};
+
+const initialData = getInitialData();
+
 interface AppState {
   batches: ProductionBatch[];
   grindingRecords: GrindingRecord[];
@@ -49,6 +101,7 @@ interface AppState {
   selectBatch: (batch: ProductionBatch | null) => void;
   toggleSidebar: () => void;
   updateTemperatureHumidity: () => void;
+  resetData: () => void;
   
   getDashboardStats: () => DashboardStats;
   getActiveBatches: () => ProductionBatch[];
@@ -58,14 +111,14 @@ interface AppState {
 const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 export const useAppStore = create<AppState>((set, get) => ({
-  batches: mockBatches,
-  grindingRecords: mockGrindingRecords,
-  pressingRecords: mockPressingRecords,
-  cultivationRecords: mockCultivationRecords,
-  bottlingRecords: mockBottlingRecords,
-  fermentationRecords: mockFermentationRecords,
-  packagingRecords: mockPackagingRecords,
-  salesOrders: mockSalesOrders,
+  batches: initialData.batches,
+  grindingRecords: initialData.grindingRecords,
+  pressingRecords: initialData.pressingRecords,
+  cultivationRecords: initialData.cultivationRecords,
+  bottlingRecords: initialData.bottlingRecords,
+  fermentationRecords: initialData.fermentationRecords,
+  packagingRecords: initialData.packagingRecords,
+  salesOrders: initialData.salesOrders,
   temperatureHumidityData: generateTemperatureHumidityData(24),
   selectedBatch: null,
   sidebarCollapsed: false,
@@ -76,9 +129,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId('grind'),
       createdAt: new Date().toISOString().replace('T', ' ').substr(0, 19),
     };
-    set((state) => ({
-      grindingRecords: [...state.grindingRecords, newRecord],
-    }));
+    set((state) => {
+      const newState = {
+        grindingRecords: [...state.grindingRecords, newRecord],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: newState.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   addPressingRecord: (record) => {
@@ -87,9 +153,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId('press'),
       createdAt: new Date().toISOString().replace('T', ' ').substr(0, 19),
     };
-    set((state) => ({
-      pressingRecords: [...state.pressingRecords, newRecord],
-    }));
+    set((state) => {
+      const newState = {
+        pressingRecords: [...state.pressingRecords, newRecord],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: newState.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   addCultivationRecord: (record) => {
@@ -98,9 +177,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId('cult'),
       createdAt: new Date().toISOString().replace('T', ' ').substr(0, 19),
     };
-    set((state) => ({
-      cultivationRecords: [...state.cultivationRecords, newRecord],
-    }));
+    set((state) => {
+      const newState = {
+        cultivationRecords: [...state.cultivationRecords, newRecord],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: newState.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   addBottlingRecord: (record) => {
@@ -109,9 +201,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId('bottle'),
       createdAt: new Date().toISOString().replace('T', ' ').substr(0, 19),
     };
-    set((state) => ({
-      bottlingRecords: [...state.bottlingRecords, newRecord],
-    }));
+    set((state) => {
+      const newState = {
+        bottlingRecords: [...state.bottlingRecords, newRecord],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: newState.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   addFermentationRecord: (record) => {
@@ -120,9 +225,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId('ferm'),
       createdAt: new Date().toISOString().replace('T', ' ').substr(0, 19),
     };
-    set((state) => ({
-      fermentationRecords: [...state.fermentationRecords, newRecord],
-    }));
+    set((state) => {
+      const newState = {
+        fermentationRecords: [...state.fermentationRecords, newRecord],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: newState.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   addPackagingRecord: (record) => {
@@ -131,9 +249,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId('pack'),
       createdAt: new Date().toISOString().replace('T', ' ').substr(0, 19),
     };
-    set((state) => ({
-      packagingRecords: [...state.packagingRecords, newRecord],
-    }));
+    set((state) => {
+      const newState = {
+        packagingRecords: [...state.packagingRecords, newRecord],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: newState.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   addSalesOrder: (order) => {
@@ -141,17 +272,42 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...order,
       id: generateId('order'),
     };
-    set((state) => ({
-      salesOrders: [...state.salesOrders, newOrder],
-    }));
+    set((state) => {
+      const newState = {
+        salesOrders: [...state.salesOrders, newOrder],
+      };
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: newState.salesOrders,
+      });
+      return newState;
+    });
   },
 
   updateBatchStatus: (batchId, status, currentStep) => {
-    set((state) => ({
-      batches: state.batches.map((batch) =>
+    set((state) => {
+      const newBatches = state.batches.map((batch) =>
         batch.id === batchId ? { ...batch, status, currentStep } : batch
-      ),
-    }));
+      );
+      const newState = { batches: newBatches };
+      saveToStorage({
+        batches: newBatches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: state.salesOrders,
+      });
+      return newState;
+    });
   },
 
   selectBatch: (batch) => set({ selectedBatch: batch }),
@@ -160,6 +316,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateTemperatureHumidity: () => {
     set({ temperatureHumidityData: generateTemperatureHumidityData(24) });
+  },
+
+  resetData: () => {
+    const defaultData = {
+      batches: mockBatches,
+      grindingRecords: mockGrindingRecords,
+      pressingRecords: mockPressingRecords,
+      cultivationRecords: mockCultivationRecords,
+      bottlingRecords: mockBottlingRecords,
+      fermentationRecords: mockFermentationRecords,
+      packagingRecords: mockPackagingRecords,
+      salesOrders: mockSalesOrders,
+    };
+    saveToStorage(defaultData);
+    set(defaultData);
   },
 
   getDashboardStats: () => {
