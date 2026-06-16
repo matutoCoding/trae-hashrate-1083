@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Receipt, User, Package, DollarSign, FileText, CheckCircle, TrendingUp, BarChart3, PieChart } from 'lucide-react';
+import { Receipt, User, Package, DollarSign, FileText, CheckCircle, TrendingUp, BarChart3, PieChart, Filter, X, Truck, CheckCheck, RotateCcw } from 'lucide-react';
 import { ModuleHeader } from '../components/ui/ModuleHeader';
 import { useAppStore } from '../store/useAppStore';
 import { SalesOrder } from '../types';
@@ -9,13 +9,39 @@ import { mockMonthlyProduction } from '../data/mockData';
 const COLORS = ['#8B0000', '#556B2F', '#DEB887'];
 
 export function Sales() {
-  const { salesOrders, batches, addSalesOrder, updateBatchStatus, getDashboardStats } = useAppStore();
+  const { salesOrders, batches, addSalesOrder, updateBatchStatus, getDashboardStats, updateSalesOrder } = useAppStore();
   const [showForm, setShowForm] = useState(false);
   const stats = getDashboardStats();
 
+  const [filters, setFilters] = useState({
+    dateFrom: '',
+    dateTo: '',
+    customer: '',
+    status: '',
+  });
+
+  const [showFilters, setShowFilters] = useState(false);
+
+  const uniqueCustomers = useMemo(() => {
+    const customers = new Set(salesOrders.map(o => o.customerName));
+    return Array.from(customers).sort();
+  }, [salesOrders]);
+
+  const filteredOrders = useMemo(() => {
+    return salesOrders.filter(order => {
+      if (filters.dateFrom && order.saleDate < filters.dateFrom) return false;
+      if (filters.dateTo && order.saleDate > filters.dateTo) return false;
+      if (filters.customer && order.customerName !== filters.customer) return false;
+      if (filters.status && order.status !== filters.status) return false;
+      return true;
+    });
+  }, [salesOrders, filters]);
+
+  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.customer || filters.status;
+
   const productDistribution = useMemo(() => {
     const productMap: Record<string, number> = {};
-    salesOrders.forEach(order => {
+    filteredOrders.forEach(order => {
       productMap[order.productType] = (productMap[order.productType] || 0) + order.quantity;
     });
     const total = Object.values(productMap).reduce((sum, qty) => sum + qty, 0);
@@ -23,19 +49,28 @@ export function Sales() {
       name,
       value: total > 0 ? Math.round((value / total) * 100) : 0,
     }));
-  }, [salesOrders]);
+  }, [filteredOrders]);
 
   const monthlySalesQuantity = useMemo(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
-    return salesOrders
+    return filteredOrders
       .filter(order => order.saleDate.startsWith(currentMonth))
       .reduce((sum, order) => sum + order.quantity, 0);
-  }, [salesOrders]);
+  }, [filteredOrders]);
 
   const customerCount = useMemo(() => {
-    const customers = new Set(salesOrders.map(order => order.customerName));
+    const customers = new Set(filteredOrders.map(order => order.customerName));
     return customers.size;
-  }, [salesOrders]);
+  }, [filteredOrders]);
+
+  const filteredTotalSales = useMemo(() => {
+    return filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+  }, [filteredOrders]);
+
+  const filteredPendingOrders = useMemo(() => {
+    return filteredOrders.filter(o => o.status === 'pending').length;
+  }, [filteredOrders]);
+
   const [formData, setFormData] = useState<{
     batchId: string;
     customerName: string;
@@ -81,6 +116,23 @@ export function Sales() {
       const price = name === 'unitPrice' ? Number(value) : formData.unitPrice;
       setFormData(prev => ({ ...prev, totalAmount: qty * price }));
     }
+  };
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilters({ dateFrom: '', dateTo: '', customer: '', status: '' });
+  };
+
+  const handleShipOrder = (orderId: string) => {
+    updateSalesOrder(orderId, { status: 'shipped' });
+  };
+
+  const handleCompleteOrder = (orderId: string, batchId: string | undefined) => {
+    updateSalesOrder(orderId, { status: 'completed' });
   };
 
   const getBatchNumber = (batchId: string) => {
@@ -197,26 +249,124 @@ export function Sales() {
         </div>
       )}
 
+      <div className="card mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-primary-600" />
+            <h3 className="text-lg font-serif font-semibold text-cream-900">筛选条件</h3>
+            {hasActiveFilters && (
+              <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
+                已筛选
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-4 py-2 bg-cream-100 text-cream-700 rounded-lg hover:bg-cream-200 transition-colors text-sm font-medium"
+          >
+            {showFilters ? '收起筛选' : '展开筛选'}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="label-text">开始日期</label>
+              <input
+                type="date"
+                name="dateFrom"
+                value={filters.dateFrom}
+                onChange={handleFilterChange}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label-text">结束日期</label>
+              <input
+                type="date"
+                name="dateTo"
+                value={filters.dateTo}
+                onChange={handleFilterChange}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label-text">客户名称</label>
+              <select
+                name="customer"
+                value={filters.customer}
+                onChange={handleFilterChange}
+                className="input-field"
+              >
+                <option value="">全部客户</option>
+                {uniqueCustomers.map(customer => (
+                  <option key={customer} value={customer}>{customer}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label-text">订单状态</label>
+              <select
+                name="status"
+                value={filters.status}
+                onChange={handleFilterChange}
+                className="input-field"
+              >
+                <option value="">全部状态</option>
+                <option value="pending">待处理</option>
+                <option value="shipped">已发货</option>
+                <option value="completed">已完成</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {hasActiveFilters && (
+          <div className="flex items-center gap-3 pt-3 border-t border-cream-200">
+            <span className="text-sm text-cream-600">
+              筛选结果: 共 <span className="font-bold text-primary-600">{filteredOrders.length}</span> 条记录
+            </span>
+            <button
+              onClick={resetFilters}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-cream-600 hover:text-cream-800 bg-cream-100 rounded-lg hover:bg-cream-200 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              恢复全部
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="card opacity-0 animate-stagger-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-cream-600 mb-1">累计销售额</p>
-              <p className="text-2xl font-bold text-cream-900 font-serif">¥ {stats.totalSales.toLocaleString()}</p>
+              <p className="text-sm text-cream-600 mb-1">
+                {hasActiveFilters ? '筛选后销售额' : '累计销售额'}
+              </p>
+              <p className="text-2xl font-bold text-cream-900 font-serif">
+                ¥ {(hasActiveFilters ? filteredTotalSales : stats.totalSales).toLocaleString()}
+              </p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center"><DollarSign className="w-6 h-6 text-primary-600" /></div>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-fermentation-normal text-xs">
-            <TrendingUp className="w-3 h-3" />
-            <span>较上月增长 15%</span>
-          </div>
+          {!hasActiveFilters && (
+            <div className="mt-2 flex items-center gap-1 text-fermentation-normal text-xs">
+              <TrendingUp className="w-3 h-3" />
+              <span>较上月增长 15%</span>
+            </div>
+          )}
         </div>
 
         <div className="card opacity-0 animate-stagger-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-cream-600 mb-1">待处理订单</p>
-              <p className="text-2xl font-bold text-cream-900 font-serif">{stats.pendingOrders}</p>
+              <p className="text-sm text-cream-600 mb-1">
+                {hasActiveFilters ? '筛选后待处理' : '待处理订单'}
+              </p>
+              <p className="text-2xl font-bold text-cream-900 font-serif">
+                {hasActiveFilters ? filteredPendingOrders : stats.pendingOrders}
+              </p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center"><Receipt className="w-6 h-6 text-amber-600" /></div>
           </div>
@@ -226,7 +376,9 @@ export function Sales() {
         <div className="card opacity-0 animate-stagger-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-cream-600 mb-1">本月销售</p>
+              <p className="text-sm text-cream-600 mb-1">
+                {hasActiveFilters ? '筛选后本月销售' : '本月销售'}
+              </p>
               <p className="text-2xl font-bold text-cream-900 font-serif">{monthlySalesQuantity.toLocaleString()}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center"><BarChart3 className="w-6 h-6 text-green-600" /></div>
@@ -237,7 +389,9 @@ export function Sales() {
         <div className="card opacity-0 animate-stagger-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-cream-600 mb-1">客户数量</p>
+              <p className="text-sm text-cream-600 mb-1">
+                {hasActiveFilters ? '筛选后客户数' : '客户数量'}
+              </p>
               <p className="text-2xl font-bold text-cream-900 font-serif">{customerCount}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center"><User className="w-6 h-6 text-blue-600" /></div>
@@ -248,7 +402,12 @@ export function Sales() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 card opacity-0 animate-stagger-5">
-          <h3 className="text-lg font-serif font-semibold text-cream-900 mb-4">月度产销量统计</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-serif font-semibold text-cream-900">月度产销量统计</h3>
+            {hasActiveFilters && (
+              <span className="text-xs text-cream-500">基于筛选数据</span>
+            )}
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={mockMonthlyProduction}>
@@ -267,40 +426,57 @@ export function Sales() {
         </div>
 
         <div className="card opacity-0 animate-stagger-6">
-          <h3 className="text-lg font-serif font-semibold text-cream-900 mb-4">产品销售占比</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-serif font-semibold text-cream-900">产品销售占比</h3>
+            {hasActiveFilters && (
+              <span className="text-xs text-cream-500">基于筛选数据</span>
+            )}
+          </div>
           <div className="h-64 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <RePieChart>
-                <Pie
-                  data={productDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {productDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#FDF5E6', border: '1px solid #C4A57B', borderRadius: '8px' }}
-                />
-              </RePieChart>
-            </ResponsiveContainer>
+            {productDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={productDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {productDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#FDF5E6', border: '1px solid #C4A57B', borderRadius: '8px' }}
+                  />
+                </RePieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-cream-500">暂无数据</p>
+            )}
           </div>
         </div>
       </div>
 
       <div className="card opacity-0 animate-stagger-7">
-        <h3 className="text-lg font-serif font-semibold text-cream-900 mb-4">销售订单列表</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-serif font-semibold text-cream-900">销售订单列表</h3>
+          {hasActiveFilters && (
+            <span className="text-sm text-cream-500">
+              显示 {filteredOrders.length} / {salesOrders.length} 条记录
+            </span>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-cream-200">
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">订单号</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">批次号</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">客户名称</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">产品类型</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">数量</th>
@@ -308,12 +484,14 @@ export function Sales() {
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">总金额</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">销售日期</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">状态</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-cream-700">操作</th>
               </tr>
             </thead>
             <tbody>
-              {salesOrders.map((order: SalesOrder, index: number) => (
+              {filteredOrders.map((order: SalesOrder, index: number) => (
                 <tr key={order.id} className="border-b border-cream-100 hover:bg-cream-50 transition-colors">
                   <td className="py-3 px-4"><span className="font-mono text-sm">{order.id.slice(-8).toUpperCase()}</span></td>
+                  <td className="py-3 px-4"><span className="font-mono text-sm text-cream-600">{getBatchNumber(order.batchId || '')}</span></td>
                   <td className="py-3 px-4 text-sm text-cream-700">{order.customerName}</td>
                   <td className="py-3 px-4 text-sm text-cream-700">{order.productType}</td>
                   <td className="py-3 px-4 text-sm text-cream-700">{order.quantity.toLocaleString()}</td>
@@ -324,6 +502,28 @@ export function Sales() {
                     <span className={`status-badge ${getStatusColor(order.status)}`}>
                       {getStatusText(order.status)}
                     </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      {order.status === 'pending' && (
+                        <button
+                          onClick={() => handleShipOrder(order.id)}
+                          className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium hover:bg-amber-200 transition-colors"
+                        >
+                          <Truck className="w-3 h-3" />
+                          发货
+                        </button>
+                      )}
+                      {order.status === 'shipped' && (
+                        <button
+                          onClick={() => handleCompleteOrder(order.id, order.batchId)}
+                          className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition-colors"
+                        >
+                          <CheckCheck className="w-3 h-3" />
+                          完成
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -76,6 +76,16 @@ const getInitialData = (): PersistedData => {
 
 const initialData = getInitialData();
 
+export interface BatchHistory {
+  grinding: GrindingRecord | null;
+  pressing: PressingRecord | null;
+  cultivation: CultivationRecord | null;
+  bottling: BottlingRecord | null;
+  fermentation: FermentationRecord | null;
+  packaging: PackagingRecord | null;
+  sales: SalesOrder[];
+}
+
 interface AppState {
   batches: ProductionBatch[];
   grindingRecords: GrindingRecord[];
@@ -88,6 +98,7 @@ interface AppState {
   temperatureHumidityData: TemperatureHumidity[];
   selectedBatch: ProductionBatch | null;
   sidebarCollapsed: boolean;
+  showBatchDetail: boolean;
   
   addGrindingRecord: (record: Omit<GrindingRecord, 'id' | 'createdAt'>) => void;
   addPressingRecord: (record: Omit<PressingRecord, 'id' | 'createdAt'>) => void;
@@ -96,9 +107,11 @@ interface AppState {
   addFermentationRecord: (record: Omit<FermentationRecord, 'id' | 'createdAt'>) => void;
   addPackagingRecord: (record: Omit<PackagingRecord, 'id' | 'createdAt'>) => void;
   addSalesOrder: (order: Omit<SalesOrder, 'id'>) => void;
+  updateSalesOrder: (orderId: string, updates: Partial<SalesOrder>) => void;
   
   updateBatchStatus: (batchId: string, status: BatchStatus, currentStep: number) => void;
   selectBatch: (batch: ProductionBatch | null) => void;
+  setShowBatchDetail: (show: boolean) => void;
   toggleSidebar: () => void;
   updateTemperatureHumidity: () => void;
   resetData: () => void;
@@ -106,6 +119,8 @@ interface AppState {
   getDashboardStats: () => DashboardStats;
   getActiveBatches: () => ProductionBatch[];
   getBatchById: (id: string) => ProductionBatch | undefined;
+  getBatchHistory: (batchId: string) => BatchHistory;
+  getProductDistribution: () => { name: string; value: number }[];
 }
 
 const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -122,6 +137,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   temperatureHumidityData: generateTemperatureHumidityData(24),
   selectedBatch: null,
   sidebarCollapsed: false,
+  showBatchDetail: false,
 
   addGrindingRecord: (record) => {
     const newRecord: GrindingRecord = {
@@ -366,5 +382,69 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getBatchById: (id) => {
     return get().batches.find(b => b.id === id);
+  },
+
+  updateSalesOrder: (orderId, updates) => {
+    set((state) => {
+      const newSalesOrders = state.salesOrders.map(order =>
+        order.id === orderId ? { ...order, ...updates } : order
+      );
+      const updatedOrder = newSalesOrders.find(o => o.id === orderId);
+      if (updatedOrder && updatedOrder.batchId && updatedOrder.status === 'completed') {
+        const newBatches = state.batches.map(batch =>
+          batch.id === updatedOrder.batchId ? { ...batch, status: 'sold' as BatchStatus, currentStep: 8 } : batch
+        );
+        saveToStorage({
+          batches: newBatches,
+          grindingRecords: state.grindingRecords,
+          pressingRecords: state.pressingRecords,
+          cultivationRecords: state.cultivationRecords,
+          bottlingRecords: state.bottlingRecords,
+          fermentationRecords: state.fermentationRecords,
+          packagingRecords: state.packagingRecords,
+          salesOrders: newSalesOrders,
+        });
+        return { salesOrders: newSalesOrders, batches: newBatches };
+      }
+      saveToStorage({
+        batches: state.batches,
+        grindingRecords: state.grindingRecords,
+        pressingRecords: state.pressingRecords,
+        cultivationRecords: state.cultivationRecords,
+        bottlingRecords: state.bottlingRecords,
+        fermentationRecords: state.fermentationRecords,
+        packagingRecords: state.packagingRecords,
+        salesOrders: newSalesOrders,
+      });
+      return { salesOrders: newSalesOrders };
+    });
+  },
+
+  setShowBatchDetail: (show) => set({ showBatchDetail: show }),
+
+  getBatchHistory: (batchId) => {
+    const state = get();
+    return {
+      grinding: state.grindingRecords.find(r => r.batchId === batchId) || null,
+      pressing: state.pressingRecords.find(r => r.batchId === batchId) || null,
+      cultivation: state.cultivationRecords.find(r => r.batchId === batchId) || null,
+      bottling: state.bottlingRecords.find(r => r.batchId === batchId) || null,
+      fermentation: state.fermentationRecords.find(r => r.batchId === batchId) || null,
+      packaging: state.packagingRecords.find(r => r.batchId === batchId) || null,
+      sales: state.salesOrders.filter(o => o.batchId === batchId),
+    };
+  },
+
+  getProductDistribution: () => {
+    const salesOrders = get().salesOrders;
+    const productMap: Record<string, number> = {};
+    salesOrders.forEach(order => {
+      productMap[order.productType] = (productMap[order.productType] || 0) + order.quantity;
+    });
+    const total = Object.values(productMap).reduce((sum, qty) => sum + qty, 0);
+    return Object.entries(productMap).map(([name, value]) => ({
+      name,
+      value: total > 0 ? Math.round((value / total) * 100) : 0,
+    }));
   },
 }));
